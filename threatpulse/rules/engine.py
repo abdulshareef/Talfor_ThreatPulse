@@ -41,10 +41,29 @@ class Rule:
     path: str = ""
     status: str = "stable"
     falsepositives: List[str] = field(default_factory=list)
+    # Granular ATT&CK mapping: selection name -> techniques. When present, an alert
+    # carries only the techniques of the selections that actually matched (plus
+    # ``mitre_always``), instead of every technique the hypothesis could cover.
+    technique_map: Dict[str, List[str]] = field(default_factory=dict)
+    mitre_always: List[str] = field(default_factory=list)
+    selections: Dict[str, Matcher] = field(default_factory=dict, repr=False)
 
     @property
     def severity_score(self) -> float:
         return SEVERITY.get(str(self.severity).lower(), 0.5)
+
+    def techniques_for(self, ev: Event, details: Optional[Dict[str, Any]] = None) -> List[str]:
+        """ATT&CK techniques evidenced by this specific hit."""
+        if details and "mitre" in details:          # analytics decide from what they observed
+            return sorted(set(details["mitre"]))
+        if not self.technique_map:
+            return list(self.mitre)
+        out = set(self.mitre_always)
+        for sel, techs in self.technique_map.items():
+            m = self.selections.get(sel)
+            if m is not None and m(ev):
+                out.update(techs)
+        return sorted(out) if out else list(self.mitre)
 
 
 @dataclass
@@ -265,6 +284,10 @@ def compile_condition(cond: str, selections: Dict[str, Matcher]) -> Matcher:
 
 
 def compile_detection(detection: Dict[str, Any]) -> Matcher:
+    return compile_detection_full(detection)[0]
+
+
+def compile_detection_full(detection: Dict[str, Any]) -> Tuple[Matcher, Dict[str, Matcher]]:
     detection = dict(detection)
     cond = detection.pop("condition", None)
     detection.pop("timeframe", None)
@@ -273,7 +296,7 @@ def compile_detection(detection: Dict[str, Any]) -> Matcher:
     if isinstance(cond, list):
         cond = " or ".join(f"({c})" for c in cond)
     selections = {name: _selection_matcher(sel) for name, sel in detection.items()}
-    return compile_condition(str(cond), selections)
+    return compile_condition(str(cond), selections), selections
 
 
 # ----------------------------------------------------------------------------
@@ -371,14 +394,21 @@ def rule_from_dict(doc: Dict[str, Any], path: str = "") -> Rule:
         falsepositives=list(doc.get("falsepositives") or []),
     )
     if rule.type == "match":
-        rule.matcher = compile_detection(doc["detection"])
+        rule.matcher, rule.selections = compile_detection_full(doc["detection"])
     elif rule.type == "analytic":
         rule.analytic = str(doc["analytic"])
         rule.params = dict(doc.get("params") or {})
         if "detection" in doc:  # optional pre-filter
-            rule.matcher = compile_detection(doc["detection"])
+            rule.matcher, rule.selections = compile_detection_full(doc["detection"])
     else:
         raise RuleError(f"unknown rule type '{rule.type}'")
+    tmap = doc.get("technique_map") or {}
+    if tmap:
+        unknown = [k for k in tmap if k not in rule.selections]
+        if unknown:
+            raise RuleError(f"technique_map refers to unknown selections: {unknown}")
+        rule.technique_map = {k: [str(t) for t in v] for k, v in tmap.items()}
+    rule.mitre_always = [str(m) for m in doc.get("mitre_always", [])]
     return rule
 
 
