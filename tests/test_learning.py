@@ -57,7 +57,7 @@ def test_beacon_detects_periodic_not_random():
     for _ in range(15):
         t += 60 + rng.uniform(-1, 1)
         fired = fired or b.process({"tp_host": "h", "tp_image": "x.exe", "DestinationIp": "1.2.3.4", "tp_ts": t})
-    assert fired and fired["jitter_cv"] < 0.05
+    assert fired and fired["jitter_cv"] < 0.05 and fired["mitre"] == ["T1071"]  # no port -> parent technique
     b2 = analytics.build("beacon", {"min_connections": 10, "max_cv": 0.15})
     t, fired = 0.0, None
     for _ in range(40):
@@ -84,3 +84,47 @@ def test_first_seen_needs_baseline():
         assert fs.process({"u": u, "h": "srv"}) is None
     assert fs.process({"u": "a", "h": "srv"}) is None
     assert fs.process({"u": "z", "h": "srv"})["new_pair"] == "z|srv"
+
+
+def test_beacon_web_port_maps_to_web_protocols():
+    b = analytics.build("beacon", {"min_connections": 10, "max_cv": 0.15})
+    t, fired = 0.0, None
+    for _ in range(12):
+        t += 30
+        fired = fired or b.process({"tp_host": "h", "tp_image": "x.exe", "DestinationIp": "1.2.3.4",
+                                    "DestinationPort": "443", "tp_ts": t})
+    assert fired["mitre"] == ["T1071.001"]
+
+
+def _burst(names):
+    b = analytics.build("burst", {"threshold": 50, "window": 60})
+    out = None
+    for i, n in enumerate(names):
+        out = out or b.process({"tp_image": "x.exe", "Computer": "h", "Image": "x.exe",
+                                "TargetFilename": n, "tp_ts": i * 0.1})
+    return out
+
+
+def test_burst_alone_is_not_encryption():
+    out = _burst([f"C:\\build\\obj\\f{i}.dll" for i in range(60)])
+    assert out and out["encryption_indicator"] is False and out["mitre"] == []
+
+
+def test_burst_with_appended_extension_is_encryption_indicator():
+    out = _burst([f"D:\\share\\doc{i}.xlsx.lockd" for i in range(60)])
+    assert out["encryption_indicator"] is True and out["mitre"] == ["T1486"]
+
+
+def test_dga_fires_on_many_failed_random_domains_only():
+    rng = random.Random(5)
+    d = analytics.build("dga", {"distinct_domains": 15})
+    fired = None
+    for i in range(20):
+        sld = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(14))
+        fired = fired or d.process({"tp_host": "h", "QueryName": f"{sld}.com", "QueryStatus": "9003", "tp_ts": float(i)})
+    assert fired and fired["failed_random_domains"] >= 15
+    d2 = analytics.build("dga", {"distinct_domains": 15})
+    for i in range(40):
+        sld = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(14))
+        assert d2.process({"tp_host": "h", "QueryName": f"{sld}.com", "QueryStatus": "0", "tp_ts": float(i)}) is None
+        assert d2.process({"tp_host": "h", "QueryName": sld, "QueryStatus": "9003", "tp_ts": float(i)}) is None

