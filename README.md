@@ -19,7 +19,7 @@ ThreatPulse splits the work:
 | **2. Learning engine** | Streaming Half-Space Trees, rarity baselines, beacon/DNS/burst analytics, and a fusion model that **learns from analyst TP/FP feedback** | Online, CPU-only, no GPU | Per-alert "why" |
 | **3. Local LLM (optional)** | Writes alert narratives and drafts new hypothesis rules from threat intel (Ollama, on-prem) | Off the hot path | Never decides a verdict |
 
-Every run is **hash-chained, tamper-evident and hashed on input**. It also produces a technical annexure to support certification under **Section 63, Bharatiya Sakshya Adhiniyam 2023**.
+Every run is **hash-chained, tamper-evident and hashed on input**. It also produces a jurisdiction-neutral technical annexure that records what courts typically need to authenticate electronic evidence.
 
 ## The 10 hunting hypotheses
 
@@ -115,9 +115,9 @@ Each run writes these files to `threatpulse_runs/<run-id>/`:
 
 | File | Contents |
 |---|---|
-| `manifest.json` | SHA-256 of every input, tool-build digest, rule-set digest, model digests before/after, UTC + IST timestamps, operator, case ID |
+| `manifest.json` | SHA-256 of every input, tool-build digest, rule-set digest, model digests before/after, UTC + examiner-local timestamps, operator, case ID |
 | `alerts.jsonl` | Hash-chained ledger (`hash = SHA-256(prev_hash ‖ record)`). Edits, deletions, re-ordering and truncation are all detected by `threatpulse verify` |
-| `certificate_annex.md` | Technical particulars to support a **BSA 2023 s.63(4)** certificate. Part A and Part B of the Schedule must still be completed and signed by the competent persons |
+| `evidence_annex.md` | Jurisdiction-neutral technical particulars: records examined and their hashes, the processing computer and tool build, timestamps, operator and re-verification steps. It supports, but does not replace, any certificate, declaration or expert report your jurisdiction requires |
 | `report.html` | Offline, phone-friendly report: attack chains and ranked alerts with "why" |
 
 ## Writing rules
