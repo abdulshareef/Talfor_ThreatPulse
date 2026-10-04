@@ -63,6 +63,7 @@ class Beacon(Analytic):
         self.min_iv = float(params.get("min_interval", 5))
         self.max_iv = float(params.get("max_interval", 3600))
         self.exclude = {x.lower() for x in params.get("exclude_images", [])}
+        self.web_ports = {str(p) for p in params.get("web_ports", [80, 443, 8080, 8443])}
         self.series: Dict[str, deque] = {}
         self.fired: set = set()
 
@@ -89,14 +90,35 @@ class Beacon(Analytic):
         cv = pstdev(ivs) / mu if mu else 1.0
         if cv <= self.max_cv:
             self.fired.add(key)
-            return {"destination": dest, "port": ev.get("DestinationPort"), "connections": len(dq),
+            port = str(ev.get("DestinationPort", ""))
+            # Periodicity says "C2-like", not which protocol or whether it is encrypted.
+            # Only claim the Web-protocols sub-technique when the port supports it.
+            mitre = ["T1071.001"] if port in self.web_ports else ["T1071"]
+            return {"destination": dest, "port": port, "connections": len(dq),
                     "mean_interval_s": round(mu, 2), "jitter_cv": round(cv, 4),
-                    "beacon_score": round(max(0.0, 1 - cv / self.max_cv), 3)}
+                    "beacon_score": round(max(0.0, 1 - cv / self.max_cv), 3), "mitre": mitre}
         return None
 
 
+_COMMON_EXT = {"tmp", "log", "txt", "dat", "db", "etl", "pf", "dll", "exe", "json", "xml", "ini", "lnk",
+               "docx", "xlsx", "pptx", "doc", "xls", "pdf", "jpg", "png", "zip", "cab", "msi", "cache", ""}
+
+
+def _exts(path: str):
+    name = str(path).replace("/", "\\").rsplit("\\", 1)[-1].lower()
+    parts = name.split(".")
+    last = parts[-1] if len(parts) > 1 else ""
+    prev = parts[-2] if len(parts) > 2 else ""
+    return last, prev
+
+
 class Burst(Analytic):
-    """Too many events per key in a sliding window."""
+    """Too many file writes by one process in a sliding window.
+
+    A burst on its own is a behavioural signal, not proof of encryption. T1486 is
+    attached only when encryption indicators are present: most files in the burst
+    share one *uncommon* extension appended onto a normal one (``report.xlsx.lockd``).
+    """
 
     name = "burst"
 
@@ -105,6 +127,7 @@ class Burst(Analytic):
         self.fields = params.get("key_fields", ["Computer", "Image"])
         self.window = float(params.get("window", 60))
         self.threshold = int(params.get("threshold", 300))
+        self.ext_ratio = float(params.get("encryption_ext_ratio", 0.7))
         self.exclude = {x.lower() for x in params.get("exclude_images", [])}
         self.buckets: Dict[str, deque] = {}
         self.last_fire: Dict[str, float] = {}
@@ -115,12 +138,19 @@ class Burst(Analytic):
         key = "|".join(str(ev.get(f, "")).lower() for f in self.fields)
         t = float(ev.get("tp_ts", 0.0))
         dq = self.buckets.setdefault(key, deque())
-        dq.append(t)
-        while dq and t - dq[0] > self.window:
+        dq.append((t, _exts(ev.get("TargetFilename", ""))))
+        while dq and t - dq[0][0] > self.window:
             dq.popleft()
         if len(dq) >= self.threshold and t - self.last_fire.get(key, -1e18) > self.window:
             self.last_fire[key] = t
-            return {"events_in_window": len(dq), "window_s": self.window}
+            counts = Counter(last for _, (last, _p) in dq)
+            ext, n = counts.most_common(1)[0]
+            ratio = n / len(dq)
+            appended = sum(1 for _, (last, prev) in dq if last == ext and prev in _COMMON_EXT and prev) / len(dq)
+            indicator = ratio >= self.ext_ratio and ext not in _COMMON_EXT and appended >= 0.5
+            return {"events_in_window": len(dq), "window_s": self.window,
+                    "dominant_extension": ext, "dominant_ratio": round(ratio, 3),
+                    "encryption_indicator": indicator, "mitre": ["T1486"] if indicator else []}
         return None
 
 
@@ -198,7 +228,51 @@ class DnsTunnel(Analytic):
         return None
 
 
-ANALYTICS = {c.name: c for c in (Beacon, Burst, FirstSeen, DnsTunnel)}
+class Dga(Analytic):
+    """DGA-like resolution: one host failing to resolve many distinct, random-looking
+    registrable domains in a short window (malware cycling generated domains until
+    one is registered). Different from tunnelling, which uses many *subdomains*
+    of a single, resolving parent domain."""
+
+    name = "dga"
+
+    def __init__(self, params):
+        super().__init__(params)
+        self.window = float(params.get("window", 600))
+        self.min_len = int(params.get("min_label_len", 8))
+        self.min_ent = float(params.get("min_entropy", 3.0))
+        self.threshold = int(params.get("distinct_domains", 15))
+        self.ok_status = {str(x) for x in params.get("success_status", ["0"])}
+        self.allow = {d.lower() for d in params.get("allow_domains", [])}
+        self.buckets: Dict[str, deque] = {}
+        self.last_fire: Dict[str, float] = {}
+
+    def process(self, ev):
+        q = str(ev.get("QueryName", "")).lower().strip(".")
+        status = str(ev.get("QueryStatus", "0")).strip()
+        if not q or "." not in q or status in self.ok_status:
+            return None
+        dom = parent_domain(q)
+        if dom in self.allow:
+            return None
+        label = dom.split(".")[0]
+        if len(label) < self.min_len or shannon_entropy(label) < self.min_ent:
+            return None
+        host = ev.get("tp_host")
+        t = float(ev.get("tp_ts", 0.0))
+        dq = self.buckets.setdefault(host, deque())
+        dq.append((t, dom))
+        while dq and t - dq[0][0] > self.window:
+            dq.popleft()
+        distinct = {d for _, d in dq}
+        if len(distinct) >= self.threshold and t - self.last_fire.get(host, -1e18) > self.window:
+            self.last_fire[host] = t
+            return {"failed_random_domains": len(distinct), "window_s": self.window,
+                    "examples": sorted(distinct)[:5]}
+        return None
+
+
+ANALYTICS = {c.name: c for c in (Beacon, Burst, FirstSeen, DnsTunnel, Dga)}
 
 
 def build(name: str, params: Dict[str, Any]) -> Analytic:
