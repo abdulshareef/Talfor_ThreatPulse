@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.threatpulse/
+threatpulse_runs/
+threatpulse_demo/
+*.evtx
+.venv/
