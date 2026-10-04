@@ -1,0 +1,32 @@
+title: Discovery Commands Spawned by a Script Host
+id: 3f1c2a9e-5b0d-4c1e-9a77-46a1d0c0b046
+status: experimental
+description: Example Sigma rule (written for ThreatPulse) — whoami / net / nltest launched by a scripting engine, typical of post-exploitation discovery.
+author: Dr. Abdul Shareef Pallivalappil
+date: 2026-10-04
+tags:
+  - attack.discovery
+  - attack.t1033
+  - attack.t1087
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection_parent:
+    ParentImage|endswith:
+      - '\powershell.exe'
+      - '\wscript.exe'
+      - '\cscript.exe'
+      - '\mshta.exe'
+  selection_tools:
+    Image|endswith:
+      - '\whoami.exe'
+      - '\nltest.exe'
+      - '\net.exe'
+      - '\net1.exe'
+  filter_admin:
+    CommandLine|contains: 'C:\Scripts\'
+  condition: all of selection_* and not 1 of filter_*
+falsepositives:
+  - Administrative scripts
+level: medium
