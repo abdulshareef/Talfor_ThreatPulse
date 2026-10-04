@@ -175,6 +175,13 @@ class Gen:
                 t = start + timedelta(seconds=r.uniform(0, span))
                 self.emit(t, SYSMON, 22, host, Image=P["chrome"], QueryName=r.choice(BENIGN_DOMAINS),
                           QueryStatus="0", User=f"TALFOR\\{user}")
+            # benign failed lookups: stale intranet names, WPAD, Chrome's random single-label probes
+            for _ in range(r.randint(3, 8)):
+                t = start + timedelta(seconds=r.uniform(0, span))
+                q = r.choice(["wpad.talfor.lab", "intranet-old.talfor.lab", "printer3.talfor.lab",
+                              "".join(r.choice(string.ascii_lowercase) for _ in range(r.randint(7, 15)))])
+                self.emit(t, SYSMON, 22, host, Image=P["chrome"], QueryName=q, QueryStatus="9003",
+                          User=f"TALFOR\\{user}")
             # files
             for _ in range(r.randint(20, 60)):
                 t = start + timedelta(seconds=r.uniform(0, span))
@@ -238,6 +245,13 @@ class Gen:
         # Masquerading implant — no rule covers this; the learning layer must catch it
         t += timedelta(minutes=4)
         self.proc(t, ws, u, P["svchost"], implant, f"{implant} -k netsvc -p {r.getrandbits(48):x}", "ML")
+        # DGA-style lookups: the implant cycles generated domains, most return NXDOMAIN (9003)
+        gt = t
+        for _ in range(25):
+            gt += timedelta(seconds=r.uniform(2, 8))
+            sld = "".join(r.choice(string.ascii_lowercase) for _ in range(r.randint(12, 18)))
+            self.emit(gt, SYSMON, 22, ws, "H10b", Image=implant, QueryName=f"{sld}.{r.choice(['com', 'net', 'info'])}",
+                      QueryStatus="9003", User=f"TALFOR\\{u}")
         # DNS tunnelling
         dt = t
         for _ in range(120):
@@ -255,7 +269,7 @@ class Gen:
         # Defence evasion
         t += timedelta(minutes=2)
         self.proc(t, srv, u, P["cmd"], P["powershell"],
-                  "powershell.exe Set-MpPreference -DisableRealtimeMonitoring $true", "H09")
+                  "powershell.exe Set-MpPreference -DisableRealtimeMonitoring $true", "H09b")
         t += timedelta(seconds=20)
         self.proc(t, srv, u, P["cmd"], P["wevtutil"], "wevtutil.exe cl Security", "H09")
         self.emit(t + timedelta(seconds=1), SEC, 1102, srv, "H09", SubjectUserName=u)
