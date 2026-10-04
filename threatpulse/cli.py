@@ -44,7 +44,7 @@ def _print_summary(s, top_alerts=None):
         for a in top_alerts:
             print(f"   [{a['priority']:<8} {a['score']:.2f}] {a['alert_id']}  {a['host']:<20} {' / '.join(a['titles'])[:70]}")
     print(f"\n  report      {os.path.join(s['run_dir'], 'report.html')}")
-    print(f"  evidence    {os.path.join(s['run_dir'], 'alerts.jsonl')} (hash-chained) + certificate_annex.md\n")
+    print(f"  evidence    {os.path.join(s['run_dir'], 'alerts.jsonl')} (hash-chained) + evidence_annex.md\n")
 
 
 def cmd_hunt(a):
