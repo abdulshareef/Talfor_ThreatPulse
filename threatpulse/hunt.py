@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from . import analytics as analytics_mod
 from .events import Event, read_events, sha256_file
 from .evidence import (EvidenceLedger, environment, now_pair, ruleset_digest, tool_source_digest,
-                       write_certificate_annex)
+                       write_evidence_annex)
 from .learn.features import is_process_event, registry_features, static_features, vectorise
 from .learn.model import ThreatModel
 from .rules import Hit, RuleSet
@@ -276,14 +276,14 @@ def run_hunt(inputs: List[str], state_dir: str, out_dir: str, extra_rules: Itera
     digest_before = ThreatModel.digest(model_path)
     model = ThreatModel.load(model_path)
 
-    started_utc, started_ist = now_pair()
+    started_utc, started_local = now_pair()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + os.urandom(3).hex()
     run_dir = os.path.join(out_dir, run_id)
     os.makedirs(run_dir, exist_ok=True)
 
     manifest: Dict[str, Any] = {
         "run_id": run_id, "case_id": case_id, "operator": operator,
-        "started_utc": started_utc, "started_ist": started_ist,
+        "started_utc": started_utc, "started_local": started_local,
         "environment": environment(), "tool_digest": tool_source_digest(),
         "inputs": [{"path": os.path.abspath(p), "size": os.path.getsize(p), "sha256": sha256_file(p)} for p in inputs],
         "rules_loaded": len(ruleset.rules), "rule_errors": errors,
@@ -320,10 +320,10 @@ def run_hunt(inputs: List[str], state_dir: str, out_dir: str, extra_rules: Itera
     if learn:
         manifest["model_digest_after"] = model.save(model_path)
     chains = correlate(alerts)
-    fin_utc, fin_ist = now_pair()
+    fin_utc, fin_local = now_pair()
     st = hunter.stats
     manifest.update({
-        "finished_utc": fin_utc, "finished_ist": fin_ist, "events_processed": st.events,
+        "finished_utc": fin_utc, "finished_local": fin_local, "events_processed": st.events,
         "alerts": len(alerts), "ledger_head": ledger.head,
     })
     summary = {
@@ -337,7 +337,7 @@ def run_hunt(inputs: List[str], state_dir: str, out_dir: str, extra_rules: Itera
         json.dump(manifest, fh, indent=2)
     with open(os.path.join(run_dir, "summary.json"), "w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2)
-    write_certificate_annex(run_dir, manifest)
+    write_evidence_annex(run_dir, manifest)
     from .report import write_report
     write_report(run_dir, summary, alerts)
     return summary
