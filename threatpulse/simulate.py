@@ -143,7 +143,7 @@ class Gen:
         hosts = WORKSTATIONS + SERVERS
         for hi, host in enumerate(hosts):
             user = USERS[hi % len(USERS)] if host in WORKSTATIONS else "svc_backup"
-            # working day 09:00-18:30 IST == 03:30-13:00 UTC; servers run 24h
+            # working day 03:30-13:00 UTC for workstations; servers run 24h
             start = day + timedelta(hours=3, minutes=30 + r.randint(-20, 20))
             span = 9.5 * 3600 if host in WORKSTATIONS else 24 * 3600
             if host not in WORKSTATIONS:
