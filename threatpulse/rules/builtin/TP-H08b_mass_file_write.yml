@@ -1,8 +1,11 @@
 id: TP-H08b
-title: Mass file write burst by a single process (possible encryption)
+title: Ransomware-like mass file modification
 hypothesis: >
-  If files are being encrypted, one process will create or overwrite an
-  abnormal number of files in a short window.
+  If files are being encrypted, one process will create or overwrite an abnormal
+  number of files in a short window. A burst alone is a behavioural signal, not
+  proof of encryption: T1486 is attached only when encryption indicators are
+  present (most files in the burst gain the same uncommon extension appended to
+  a normal one, e.g. report.xlsx.lockd).
 severity: high
 mitre: [T1486]
 type: analytic
@@ -12,4 +15,7 @@ params:
   key_fields: [Computer, Image]
   window: 60            # seconds
   threshold: 300        # file events per window
+  encryption_ext_ratio: 0.7
   exclude_images: [msiexec.exe, trustedinstaller.exe, tiworker.exe, onedrive.exe, msmpeng.exe, svchost.exe]
+falsepositives:
+  - Build tools, archive extraction, backup and sync clients

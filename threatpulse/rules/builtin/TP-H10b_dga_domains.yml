@@ -1,0 +1,20 @@
+id: TP-H10b
+title: DGA-like resolution — many random-looking domains failing to resolve
+hypothesis: >
+  If malware uses a domain generation algorithm, an infected host will try to
+  resolve many distinct, random-looking registrable domains in a short time,
+  most of which do not exist (NXDOMAIN), until one registered by the operator answers.
+severity: high
+mitre: [T1568.002]
+type: analytic
+analytic: dga
+logsource: {channel: sysmon, event_id: 22}
+params:
+  window: 600                 # seconds
+  distinct_domains: 15        # distinct failed random-looking domains per host per window
+  min_label_len: 8
+  min_entropy: 3.0
+  success_status: ['0']       # Sysmon QueryStatus 0 = success; anything else counts as a failure
+  allow_domains: []
+falsepositives:
+  - Browsers probing random hostnames to detect DNS hijacking (short labels; mostly filtered by thresholds)

@@ -1,10 +1,11 @@
 id: TP-H07b
-title: First-seen network logon (user → host pair never seen in baseline)
+title: First-seen network logon — possible valid-account abuse
 hypothesis: >
   If stolen credentials are being reused, an account will authenticate over the
-  network to a host it has never logged on to before.
+  network to a host it has never logged on to before. The first-seen relationship
+  is the behavioural analytic; T1078 is the hypothesis it tests.
 severity: medium
-mitre: [T1078, T1021]
+mitre: [T1078]
 type: analytic
 analytic: first_seen
 logsource: {channel: security, event_id: 4624}
@@ -19,3 +20,5 @@ detection:
   anonymous:
     TargetUserName: ['anonymous logon', '-']
   condition: network_logon and not machine_accounts and not anonymous
+falsepositives:
+  - New staff, new servers, role changes (learned after first sight)

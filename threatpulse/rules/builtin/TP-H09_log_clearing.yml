@@ -1,0 +1,22 @@
+id: TP-H09
+title: Anti-forensics — Windows event log clearing
+hypothesis: >
+  If an attacker is covering tracks, Windows event logs will be cleared.
+severity: critical
+mitre: [T1070.001]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: security, event_id: 4688}
+  - {channel: security, event_id: 1102}
+  - {channel: system, event_id: 104}
+detection:
+  log_cleared:
+    EventID: [1102, 104]
+  wevtutil:
+    tp_image: wevtutil.exe
+    CommandLine|re: '\s(cl|clear-log)\s'
+  ps_clear:
+    CommandLine|contains: ['clear-eventlog', 'remove-eventlog', '.clearlog(']
+  condition: 1 of them
+falsepositives:
+  - Rare administrative log maintenance (should always be reviewed)

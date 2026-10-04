@@ -4,7 +4,10 @@ hypothesis: >
   If an implant is checking in with command-and-control, one process will make
   repeated outbound connections to the same destination at near-constant intervals.
 severity: high
-mitre: [T1071.001, T1573]
+# T1071.001 is applied only when the destination port is a web port (80/443/8080/8443);
+# otherwise the parent T1071 is used. Periodicity alone is not evidence of encryption,
+# so T1573 (Encrypted Channel) is deliberately not claimed.
+mitre: [T1071.001]
 type: analytic
 analytic: beacon
 logsource: {channel: sysmon, event_id: 3}
@@ -13,6 +16,7 @@ params:
   max_cv: 0.15          # coefficient of variation of inter-arrival times
   min_interval: 5       # seconds
   max_interval: 3600
+  web_ports: [80, 443, 8080, 8443]
   exclude_images: [svchost.exe, msmpeng.exe, onedrive.exe, teams.exe, ms-teams.exe]
 detection:
   outbound:

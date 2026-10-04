@@ -1,17 +1,20 @@
 id: TP-H05
-title: Living-off-the-land binary used to download or proxy-execute
+title: LOLBin proxy execution, decoding or payload retrieval
 hypothesis: >
   If an attacker is avoiding dropping tools, signed Windows binaries (certutil,
-  rundll32, regsvr32, mshta, bitsadmin) will be used to fetch or run remote code.
+  rundll32, regsvr32, mshta, bitsadmin) will be used to fetch, decode or run remote code.
 severity: high
-mitre: [T1218, T1105, T1140]
+mitre: [T1218.005, T1218.010, T1218.011, T1197, T1105, T1140]
 logsource:
   - {channel: sysmon, event_id: 1}
   - {channel: security, event_id: 4688}
 detection:
-  certutil:
+  certutil_download:
     tp_image: certutil.exe
-    CommandLine|contains: ['-urlcache', '/urlcache', '-decode', '/decode', '-decodehex', 'verifyctl']
+    CommandLine|contains: ['-urlcache', '/urlcache', 'verifyctl']
+  certutil_decode:
+    tp_image: certutil.exe
+    CommandLine|contains: ['-decode', '/decode', '-decodehex', '/decodehex']
   rundll32:
     tp_image: rundll32.exe
     CommandLine|contains: ['javascript:', 'url.dll,openurl', 'shell32.dll,shellexec_rundll', 'http://', 'https://']
@@ -25,3 +28,10 @@ detection:
     tp_image: bitsadmin.exe
     CommandLine|contains: ['/transfer', '/addfile', '/download']
   condition: 1 of them
+technique_map:
+  certutil_download: [T1105]
+  certutil_decode: [T1140]
+  rundll32: [T1218.011]
+  regsvr32: [T1218.010]
+  mshta: [T1218.005]
+  bitsadmin: [T1197, T1105]

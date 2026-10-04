@@ -1,10 +1,10 @@
 id: TP-H10
-title: DNS tunnelling or DGA — high-entropy / high-volume subdomains
+title: DNS C2 / tunnelling — long, high-entropy or high-volume subdomains
 hypothesis: >
-  If data is being exfiltrated or C2 is carried over DNS, a host will query many
+  If C2 traffic or data is being carried over DNS, a host will query many
   unique, long, high-entropy subdomains under one parent domain.
 severity: high
-mitre: [T1071.004, T1048.003, T1568.002]
+mitre: [T1071.004]
 type: analytic
 analytic: dns_tunnel
 logsource: {channel: sysmon, event_id: 22}
@@ -17,3 +17,5 @@ params:
   allow_domains: [microsoft.com, windows.com, windowsupdate.com, office.com, office365.com, live.com,
                   akamaiedge.net, akadns.net, cloudfront.net, amazonaws.com, googleapis.com, gstatic.com,
                   azureedge.net, trafficmanager.net, digicert.com, sophosxl.net, mcafee.com]
+falsepositives:
+  - Security products and CDNs that encode data in DNS labels (allow-list them)

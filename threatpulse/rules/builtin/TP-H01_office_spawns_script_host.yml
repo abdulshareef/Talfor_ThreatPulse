@@ -1,20 +1,51 @@
 id: TP-H01
-title: Office application spawns a script interpreter or LOLBin
+title: Office application spawns a shell, script host or LOLBin
 hypothesis: >
   If a user opened a weaponised document or attachment, an Office process will
   spawn a shell, script host or living-off-the-land binary — something Office
   almost never does legitimately.
 severity: high
-mitre: [T1566.001, T1204.002, T1059]
+# Hypothesis-level coverage. Each alert carries only the techniques of the child
+# process actually observed (technique_map), plus mitre_always.
+mitre: [T1566.001, T1204.002, T1059, T1059.001, T1059.003, T1218.005, T1218.010, T1218.011, T1218.001,
+        T1218.004, T1127.001]
+mitre_always: [T1566.001, T1204.002]
 logsource:
   - {channel: sysmon, event_id: 1}
   - {channel: security, event_id: 4688}
 detection:
   office_parent:
     tp_parent: [winword.exe, excel.exe, powerpnt.exe, outlook.exe, msaccess.exe, mspub.exe, onenote.exe, visio.exe]
-  suspicious_child:
-    tp_image: [powershell.exe, pwsh.exe, cmd.exe, wscript.exe, cscript.exe, mshta.exe, rundll32.exe,
-               regsvr32.exe, certutil.exe, bitsadmin.exe, schtasks.exe, msbuild.exe, installutil.exe, hh.exe]
-  condition: office_parent and suspicious_child
+  child_powershell:
+    tp_image: [powershell.exe, pwsh.exe]
+  child_cmd:
+    tp_image: cmd.exe
+  child_wsh:
+    tp_image: [wscript.exe, cscript.exe]
+  child_mshta:
+    tp_image: mshta.exe
+  child_rundll32:
+    tp_image: rundll32.exe
+  child_regsvr32:
+    tp_image: regsvr32.exe
+  child_hh:
+    tp_image: hh.exe
+  child_installutil:
+    tp_image: installutil.exe
+  child_msbuild:
+    tp_image: msbuild.exe
+  child_other_lolbin:
+    tp_image: [certutil.exe, bitsadmin.exe, schtasks.exe]
+  condition: office_parent and 1 of child_*
+technique_map:
+  child_powershell: [T1059.001]
+  child_cmd: [T1059.003]
+  child_wsh: [T1059]            # VBScript vs JScript cannot be told apart from the process alone
+  child_mshta: [T1218.005]
+  child_rundll32: [T1218.011]
+  child_regsvr32: [T1218.010]
+  child_hh: [T1218.001]
+  child_installutil: [T1218.004]
+  child_msbuild: [T1127.001]
 falsepositives:
   - Legitimate macros in finance/reporting workbooks that shell out (tune with feedback)

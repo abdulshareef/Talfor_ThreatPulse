@@ -1,10 +1,11 @@
 id: TP-H07
-title: Remote execution — PsExec, WMI or WinRM spawning a shell
+title: Remote execution — PsExec/PAExec, SMBExec, WMI or WinRM spawning a shell
 hypothesis: >
-  If an attacker is moving laterally, remote-execution services (PsExec, WMI,
-  WinRM, SMBExec) will spawn shells on the target host.
+  If an attacker is moving laterally, remote-execution mechanisms (PsExec-style
+  service execution, SMBExec over admin shares, WMI, WinRM) will spawn processes
+  on the target host.
 severity: high
-mitre: [T1021.002, T1047, T1021.006, T1569.002]
+mitre: [T1569.002, T1021.002, T1047, T1021.006]
 logsource:
   - {channel: sysmon, event_id: 1}
   - {channel: security, event_id: 4688}
@@ -15,13 +16,21 @@ detection:
   psexec_service:
     EventID: 7045
     ServiceName|contains: [psexesvc, paexec, remcom]
+  smbexec:
+    tp_parent: services.exe
+    CommandLine|contains: ['\\127.0.0.1\admin$', '__output']
   wmi_shell:
     tp_parent: wmiprvse.exe
     tp_image: [cmd.exe, powershell.exe, pwsh.exe, mshta.exe, rundll32.exe]
   winrm_shell:
     tp_parent: wsmprovhost.exe
     tp_image: [cmd.exe, powershell.exe, pwsh.exe]
-  smbexec:
-    tp_parent: services.exe
-    CommandLine|contains: ['\\127.0.0.1\admin$', '__output']
   condition: 1 of them
+technique_map:
+  psexec_binary: [T1569.002, T1021.002]   # service execution delivered over the ADMIN$ share
+  psexec_service: [T1569.002, T1021.002]
+  smbexec: [T1569.002, T1021.002]
+  wmi_shell: [T1047]
+  winrm_shell: [T1021.006]
+falsepositives:
+  - SCCM / admin tooling that uses WMI or PsExec

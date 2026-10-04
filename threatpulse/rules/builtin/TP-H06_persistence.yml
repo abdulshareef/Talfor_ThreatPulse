@@ -1,10 +1,11 @@
 id: TP-H06
-title: New persistence — Run key, scheduled task or service
+title: New persistence — Run key, Winlogon, IFEO, scheduled task or service
 hypothesis: >
   If an attacker wants to survive reboot, they will add an autorun registry
-  value, register a scheduled task, or install a service.
+  value, hijack Winlogon or Image File Execution Options, register a scheduled
+  task, or install a service.
 severity: medium
-mitre: [T1547.001, T1053.005, T1543.003]
+mitre: [T1547.001, T1547.004, T1546.012, T1053.005, T1543.003]
 logsource:
   - {channel: sysmon, event_id: 1}
   - {channel: sysmon, event_id: 13}
@@ -12,18 +13,38 @@ logsource:
   - {channel: security, event_id: 4698}
   - {channel: system, event_id: 7045}
 detection:
-  autorun_key:
+  persist_run_key:
     EventID: 13
-    TargetObject|contains: ['\currentversion\run', '\winlogon\userinit', '\winlogon\shell', '\image file execution options\']
-  schtasks_create:
+    TargetObject|contains: ['\currentversion\run\', '\currentversion\runonce\', '\currentversion\runonceex\',
+                            '\policies\explorer\run\']
+  persist_winlogon:
+    EventID: 13
+    TargetObject|endswith: ['\winlogon\userinit', '\winlogon\shell', '\winlogon\notify']
+  persist_ifeo:
+    EventID: 13
+    TargetObject|contains: '\image file execution options\'
+    TargetObject|endswith: ['\debugger', '\globalflag']
+  persist_silent_exit:
+    EventID: 13
+    TargetObject|contains: '\silentprocessexit\'
+    TargetObject|endswith: '\monitorprocess'
+  persist_schtasks_cli:
     tp_image: schtasks.exe
     CommandLine|contains: '/create'
-  task_registered:
+  persist_task_registered:
     EventID: 4698
-  service_installed:
+  persist_service:
     EventID: 7045
   installer:
     tp_image: [msiexec.exe, trustedinstaller.exe, tiworker.exe]
-  condition: (autorun_key or schtasks_create or task_registered or service_installed) and not installer
+  condition: 1 of persist_* and not installer
+technique_map:
+  persist_run_key: [T1547.001]
+  persist_winlogon: [T1547.004]
+  persist_ifeo: [T1546.012]
+  persist_silent_exit: [T1546.012]
+  persist_schtasks_cli: [T1053.005]
+  persist_task_registered: [T1053.005]
+  persist_service: [T1543.003]
 falsepositives:
   - Software installs and updaters — the learning layer and analyst feedback suppress recurring benign signatures

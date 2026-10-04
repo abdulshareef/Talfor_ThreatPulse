@@ -28,6 +28,7 @@ TACTICS = {
     "T1071": "command-and-control", "T1573": "command-and-control", "T1568": "command-and-control",
     "T1547": "persistence", "T1053": "persistence", "T1543": "persistence", "T1021": "lateral-movement",
     "T1078": "lateral-movement", "T1490": "impact", "T1486": "impact", "T1048": "exfiltration",
+    "T1197": "defense-evasion", "T1127": "defense-evasion", "T1546": "persistence",
 }
 
 
@@ -98,13 +99,15 @@ class Hunter:
         for rule in self.rules.candidates(ev):
             if rule.type == "match":
                 if rule.matcher(ev):
-                    hits.append(Hit(rule.id, rule.title, rule.severity, rule.severity_score, rule.mitre, ev))
+                    hits.append(Hit(rule.id, rule.title, rule.severity, rule.severity_score,
+                                    rule.techniques_for(ev), ev))
             else:
                 if rule.matcher is not None and not rule.matcher(ev):
                     continue
                 d = self.analytics[rule.id].process(ev)
                 if d:
-                    hits.append(Hit(rule.id, rule.title, rule.severity, rule.severity_score, rule.mitre, ev, d))
+                    hits.append(Hit(rule.id, rule.title, rule.severity, rule.severity_score,
+                                    rule.techniques_for(ev, d), ev, d))
 
         feats: Dict[str, float] = {}
         learn_item = None

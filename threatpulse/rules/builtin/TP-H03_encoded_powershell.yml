@@ -1,10 +1,11 @@
 id: TP-H03
-title: Encoded or download-cradle PowerShell
+title: Encoded/obfuscated or download-cradle PowerShell
 hypothesis: >
   If an attacker is staging payloads, PowerShell will be launched with an
-  encoded command or a download-and-execute cradle.
+  encoded or obfuscated command, or with a download-and-execute cradle.
 severity: high
 mitre: [T1059.001, T1027, T1105]
+mitre_always: [T1059.001]
 logsource:
   - {channel: sysmon, event_id: 1}
   - {channel: security, event_id: 4688}
@@ -13,10 +14,15 @@ detection:
     tp_image: [powershell.exe, pwsh.exe, powershell_ise.exe]
   encoded:
     CommandLine|re: '\s[-/](e|ec|en|enc|enco|encod|encode|encodedcommand)\s+[A-Za-z0-9+/=]{16,}'
+  obfuscated:
+    CommandLine|contains: ['frombase64string', '-bxor', '[char[]]', '-join[char', 'invoke-expression', 'iex(', 'iex (']
   cradle:
     CommandLine|contains: ['downloadstring', 'downloadfile', 'downloaddata', 'invoke-webrequest', 'iwr ',
-                           'net.webclient', 'frombase64string', 'invoke-expression', 'iex(', 'iex (',
-                           'start-bitstransfer', 'invoke-restmethod']
-  condition: powershell and (encoded or cradle)
+                           'net.webclient', 'start-bitstransfer', 'invoke-restmethod']
+  condition: powershell and (encoded or obfuscated or cradle)
+technique_map:
+  encoded: [T1027]
+  obfuscated: [T1027]
+  cradle: [T1105]
 falsepositives:
   - Admin automation that pulls scripts from an internal repo

@@ -1,0 +1,27 @@
+id: TP-H09b
+title: Defence evasion — Defender / Sysmon / security-tool tampering
+hypothesis: >
+  If an attacker is impairing defences, Defender protection will be disabled or
+  given exclusions, or Defender / Sysmon will be stopped or unloaded.
+severity: critical
+mitre: [T1562.001]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: security, event_id: 4688}
+  - {channel: defender, event_id: 5001}
+  - {channel: defender, event_id: 5013}
+detection:
+  defender_disabled_event:
+    EventID: [5001, 5013]     # 5001 real-time protection disabled; 5013 tamper protection blocked a change
+  defender_tamper:
+    CommandLine|contains: ['disablerealtimemonitoring', 'disableioavprotection', 'disablebehaviormonitoring',
+                           'add-mppreference -exclusionpath', 'add-mppreference -exclusionprocess',
+                           'add-mppreference -exclusionextension']
+  service_kill:
+    tp_image: [sc.exe, net.exe, net1.exe]
+    CommandLine|contains: ['stop windefend', 'stop sysmon', 'delete sysmon', 'windefend start= disabled']
+  sysmon_unload:
+    CommandLine|contains: ['sysmon.exe -u', 'sysmon64.exe -u', 'fltmc unload sysmondrv', 'fltmc.exe unload sysmondrv']
+  condition: 1 of them
+falsepositives:
+  - Authorised troubleshooting by endpoint administrators
