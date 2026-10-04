@@ -1,0 +1,15 @@
+id: TP-H08b
+title: Mass file write burst by a single process (possible encryption)
+hypothesis: >
+  If files are being encrypted, one process will create or overwrite an
+  abnormal number of files in a short window.
+severity: high
+mitre: [T1486]
+type: analytic
+analytic: burst
+logsource: {channel: sysmon, event_id: 11}
+params:
+  key_fields: [Computer, Image]
+  window: 60            # seconds
+  threshold: 300        # file events per window
+  exclude_images: [msiexec.exe, trustedinstaller.exe, tiworker.exe, onedrive.exe, msmpeng.exe, svchost.exe]

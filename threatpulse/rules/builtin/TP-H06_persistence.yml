@@ -1,0 +1,29 @@
+id: TP-H06
+title: New persistence — Run key, scheduled task or service
+hypothesis: >
+  If an attacker wants to survive reboot, they will add an autorun registry
+  value, register a scheduled task, or install a service.
+severity: medium
+mitre: [T1547.001, T1053.005, T1543.003]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: sysmon, event_id: 13}
+  - {channel: security, event_id: 4688}
+  - {channel: security, event_id: 4698}
+  - {channel: system, event_id: 7045}
+detection:
+  autorun_key:
+    EventID: 13
+    TargetObject|contains: ['\currentversion\run', '\winlogon\userinit', '\winlogon\shell', '\image file execution options\']
+  schtasks_create:
+    tp_image: schtasks.exe
+    CommandLine|contains: '/create'
+  task_registered:
+    EventID: 4698
+  service_installed:
+    EventID: 7045
+  installer:
+    tp_image: [msiexec.exe, trustedinstaller.exe, tiworker.exe]
+  condition: (autorun_key or schtasks_create or task_registered or service_installed) and not installer
+falsepositives:
+  - Software installs and updaters — the learning layer and analyst feedback suppress recurring benign signatures

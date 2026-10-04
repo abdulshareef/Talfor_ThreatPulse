@@ -1,0 +1,27 @@
+id: TP-H07
+title: Remote execution — PsExec, WMI or WinRM spawning a shell
+hypothesis: >
+  If an attacker is moving laterally, remote-execution services (PsExec, WMI,
+  WinRM, SMBExec) will spawn shells on the target host.
+severity: high
+mitre: [T1021.002, T1047, T1021.006, T1569.002]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: security, event_id: 4688}
+  - {channel: system, event_id: 7045}
+detection:
+  psexec_binary:
+    tp_image: [psexesvc.exe, paexec.exe, remcomsvc.exe, csexecsvc.exe]
+  psexec_service:
+    EventID: 7045
+    ServiceName|contains: [psexesvc, paexec, remcom]
+  wmi_shell:
+    tp_parent: wmiprvse.exe
+    tp_image: [cmd.exe, powershell.exe, pwsh.exe, mshta.exe, rundll32.exe]
+  winrm_shell:
+    tp_parent: wsmprovhost.exe
+    tp_image: [cmd.exe, powershell.exe, pwsh.exe]
+  smbexec:
+    tp_parent: services.exe
+    CommandLine|contains: ['\\127.0.0.1\admin$', '__output']
+  condition: 1 of them

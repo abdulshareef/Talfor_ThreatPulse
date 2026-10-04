@@ -1,0 +1,22 @@
+id: TP-H03
+title: Encoded or download-cradle PowerShell
+hypothesis: >
+  If an attacker is staging payloads, PowerShell will be launched with an
+  encoded command or a download-and-execute cradle.
+severity: high
+mitre: [T1059.001, T1027, T1105]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: security, event_id: 4688}
+detection:
+  powershell:
+    tp_image: [powershell.exe, pwsh.exe, powershell_ise.exe]
+  encoded:
+    CommandLine|re: '\s[-/](e|ec|en|enc|enco|encod|encode|encodedcommand)\s+[A-Za-z0-9+/=]{16,}'
+  cradle:
+    CommandLine|contains: ['downloadstring', 'downloadfile', 'downloaddata', 'invoke-webrequest', 'iwr ',
+                           'net.webclient', 'frombase64string', 'invoke-expression', 'iex(', 'iex (',
+                           'start-bitstransfer', 'invoke-restmethod']
+  condition: powershell and (encoded or cradle)
+falsepositives:
+  - Admin automation that pulls scripts from an internal repo

@@ -1,0 +1,19 @@
+id: TP-H02
+title: Credential dumping — suspicious handle to LSASS memory
+hypothesis: >
+  If an attacker is harvesting credentials, a non-system process will open
+  lsass.exe with memory-read access rights (Mimikatz, comsvcs MiniDump, procdump).
+severity: critical
+mitre: [T1003.001]
+logsource: {channel: sysmon, event_id: 10}
+detection:
+  target:
+    TargetImage|endswith: '\lsass.exe'
+  read_access:
+    GrantedAccess: ['0x1010', '0x1410', '0x1438', '0x143a', '0x1418', '0x1fffff', '0x1f3fff', '0x1f0fff']
+  trusted_source:
+    SourceImage|endswith: ['\MsMpEng.exe', '\wininit.exe', '\csrss.exe', '\lsm.exe', '\MsSense.exe',
+                           '\vmtoolsd.exe', '\svchost.exe', '\services.exe']
+  condition: target and read_access and not trusted_source
+falsepositives:
+  - Third-party EDR / backup agents (add to trusted_source or mark FP)

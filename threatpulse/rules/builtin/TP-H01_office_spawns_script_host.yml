@@ -1,0 +1,20 @@
+id: TP-H01
+title: Office application spawns a script interpreter or LOLBin
+hypothesis: >
+  If a user opened a weaponised document or attachment, an Office process will
+  spawn a shell, script host or living-off-the-land binary — something Office
+  almost never does legitimately.
+severity: high
+mitre: [T1566.001, T1204.002, T1059]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: security, event_id: 4688}
+detection:
+  office_parent:
+    tp_parent: [winword.exe, excel.exe, powerpnt.exe, outlook.exe, msaccess.exe, mspub.exe, onenote.exe, visio.exe]
+  suspicious_child:
+    tp_image: [powershell.exe, pwsh.exe, cmd.exe, wscript.exe, cscript.exe, mshta.exe, rundll32.exe,
+               regsvr32.exe, certutil.exe, bitsadmin.exe, schtasks.exe, msbuild.exe, installutil.exe, hh.exe]
+  condition: office_parent and suspicious_child
+falsepositives:
+  - Legitimate macros in finance/reporting workbooks that shell out (tune with feedback)

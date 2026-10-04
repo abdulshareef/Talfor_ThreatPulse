@@ -1,0 +1,24 @@
+id: TP-H04
+title: C2 beaconing — regular outbound connections with low jitter
+hypothesis: >
+  If an implant is checking in with command-and-control, one process will make
+  repeated outbound connections to the same destination at near-constant intervals.
+severity: high
+mitre: [T1071.001, T1573]
+type: analytic
+analytic: beacon
+logsource: {channel: sysmon, event_id: 3}
+params:
+  min_connections: 10
+  max_cv: 0.15          # coefficient of variation of inter-arrival times
+  min_interval: 5       # seconds
+  max_interval: 3600
+  exclude_images: [svchost.exe, msmpeng.exe, onedrive.exe, teams.exe, ms-teams.exe]
+detection:
+  outbound:
+    Initiated: 'true'
+  internal:
+    DestinationIp|re: '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|127\.|169\.254\.|::1|fe80:)'
+  condition: outbound and not internal
+falsepositives:
+  - Monitoring / telemetry agents with fixed polling (exclude_images or feedback)

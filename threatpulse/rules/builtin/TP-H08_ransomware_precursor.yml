@@ -1,0 +1,27 @@
+id: TP-H08
+title: Ransomware precursor — shadow copy / recovery destruction
+hypothesis: >
+  If ransomware is about to encrypt, the operator will first delete volume
+  shadow copies, backups and boot recovery options.
+severity: critical
+mitre: [T1490]
+logsource:
+  - {channel: sysmon, event_id: 1}
+  - {channel: security, event_id: 4688}
+detection:
+  vssadmin:
+    tp_image: vssadmin.exe
+    CommandLine|contains: ['delete shadows', 'resize shadowstorage']
+  wmic:
+    tp_image: wmic.exe
+    CommandLine|contains: 'shadowcopy delete'
+  powershell_vss:
+    tp_image: [powershell.exe, pwsh.exe]
+    CommandLine|contains|all: ['win32_shadowcopy', 'delete']
+  bcdedit:
+    tp_image: bcdedit.exe
+    CommandLine|contains: ['recoveryenabled no', 'bootstatuspolicy ignoreallfailures']
+  wbadmin:
+    tp_image: wbadmin.exe
+    CommandLine|contains: ['delete catalog', 'delete systemstatebackup', 'delete backup']
+  condition: 1 of them

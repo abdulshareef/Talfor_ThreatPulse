@@ -1,0 +1,21 @@
+id: TP-H07b
+title: First-seen network logon (user → host pair never seen in baseline)
+hypothesis: >
+  If stolen credentials are being reused, an account will authenticate over the
+  network to a host it has never logged on to before.
+severity: medium
+mitre: [T1078, T1021]
+type: analytic
+analytic: first_seen
+logsource: {channel: security, event_id: 4624}
+params:
+  fields: [TargetUserName, Computer]
+  min_baseline: 15      # distinct pairs observed before this rule may fire
+detection:
+  network_logon:
+    LogonType: ['3', '10']
+  machine_accounts:
+    TargetUserName|endswith: '$'
+  anonymous:
+    TargetUserName: ['anonymous logon', '-']
+  condition: network_logon and not machine_accounts and not anonymous
