@@ -23,7 +23,7 @@
         ▼
  optional local LLM narratives (top N, never alters score)    Layer 3
         ▼
- run dir: manifest.json · alerts.jsonl (hash chain) · certificate_annex.md · report.html
+ run dir: manifest.json · alerts.jsonl (hash chain) · evidence_annex.md · report.html
 ```
 
 ## Design choices

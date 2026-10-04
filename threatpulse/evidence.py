@@ -1,6 +1,7 @@
 """Forensic soundness: hash-chained evidence ledger, run manifest and a
-technical annexure to support certification of electronic records under
-Section 63 of the Bharatiya Sakshya Adhiniyam, 2023 (BSA).
+jurisdiction-neutral technical annexure that records the particulars courts
+commonly require when electronic evidence is authenticated (integrity hashes,
+the system and tool that produced it, timestamps, operator, chain of custody).
 
 Every alert is written as one JSON line whose ``hash`` is
 ``SHA-256(prev_hash || canonical_json(record))``. Altering, inserting,
@@ -14,13 +15,12 @@ import os
 import platform
 import socket
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import TOOL_NAME, __author__, __version__
 
 GENESIS = "0" * 64
-IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def canonical(obj: Any) -> str:
@@ -87,8 +87,9 @@ def verify_ledger(path: str, expected_head: Optional[str] = None) -> Tuple[bool,
 
 
 def now_pair() -> Tuple[str, str]:
+    """Return (UTC, local time of the processing machine incl. its UTC offset)."""
     t = datetime.now(timezone.utc)
-    return t.isoformat(timespec="seconds"), t.astimezone(IST).isoformat(timespec="seconds")
+    return t.isoformat(timespec="seconds"), t.astimezone().isoformat(timespec="seconds")
 
 
 def environment() -> Dict[str, str]:
@@ -116,19 +117,22 @@ def tool_source_digest() -> str:
     return h.hexdigest()
 
 
-def write_certificate_annex(run_dir: str, manifest: Dict[str, Any]) -> str:
+def write_evidence_annex(run_dir: str, manifest: Dict[str, Any]) -> str:
     inputs = manifest.get("inputs", [])
     rows = "\n".join(f"| {i+1} | `{os.path.basename(x['path'])}` | {x['size']} | `{x['sha256']}` |"
                      for i, x in enumerate(inputs))
     env = manifest.get("environment", {})
     text = f"""# Technical Annexure — Automated Threat Hunt
 
-**Supporting particulars for a certificate under Section 63(4) of the Bharatiya Sakshya Adhiniyam, 2023**
+**Technical particulars of the processing of electronic records**
 
-> This annexure records the technical particulars of an automated analysis run.
-> It is **not** itself the certificate. The certificate in the form prescribed in
-> the Schedule (Part A by the person in charge of the computer/device, Part B by
-> the expert) must be completed, verified and signed by the competent persons.
+> This annexure records how an automated analysis run was performed: which
+> records were examined, their cryptographic hashes, the computer and tool
+> used, and how integrity can be re-verified. It is jurisdiction-neutral and is
+> intended to support whatever authentication, certification or expert-report
+> requirements apply where the evidence is presented. It is **not** itself a
+> legal certificate or declaration; that must be prepared and signed by the
+> competent person under the applicable law.
 
 ## 1. Case and operator
 | Field | Value |
@@ -136,8 +140,8 @@ def write_certificate_annex(run_dir: str, manifest: Dict[str, Any]) -> str:
 | Case / reference | {manifest.get('case_id') or '—'} |
 | Operator | {manifest.get('operator') or '—'} |
 | Run ID | `{manifest['run_id']}` |
-| Started (UTC / IST) | {manifest['started_utc']} / {manifest['started_ist']} |
-| Completed (UTC / IST) | {manifest.get('finished_utc', '—')} / {manifest.get('finished_ist', '—')} |
+| Started (UTC / local) | {manifest['started_utc']} / {manifest['started_local']} |
+| Completed (UTC / local) | {manifest.get('finished_utc', '—')} / {manifest.get('finished_local', '—')} |
 
 ## 2. Computer resource used for processing
 | Field | Value |
@@ -177,7 +181,7 @@ threatpulse verify {os.path.basename(run_dir)}
 Machine-learning scores are investigative leads that rank events for human
 review. They are not, by themselves, conclusions of fact.
 """
-    path = os.path.join(run_dir, "certificate_annex.md")
+    path = os.path.join(run_dir, "evidence_annex.md")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
     return path

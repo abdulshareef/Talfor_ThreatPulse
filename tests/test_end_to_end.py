@@ -33,8 +33,9 @@ def test_manifest_and_ledger(demo):
     m = json.load(open(os.path.join(run_dir, "manifest.json")))
     assert m["case_id"] == "TEST-1" and len(m["inputs"][0]["sha256"]) == 64
     assert verify_ledger(os.path.join(run_dir, "alerts.jsonl"), m["ledger_head"])[0]
-    annex = open(os.path.join(run_dir, "certificate_annex.md")).read()
-    assert "Section 63" in annex and m["inputs"][0]["sha256"] in annex
+    annex = open(os.path.join(run_dir, "evidence_annex.md")).read()
+    assert "jurisdiction-neutral" in annex and m["inputs"][0]["sha256"] in annex
+    assert m["started_local"] and m["finished_local"]
     assert os.path.exists(os.path.join(run_dir, "report.html"))
 
 
