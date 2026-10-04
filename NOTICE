@@ -1,0 +1,6 @@
+Talfor_ThreatPulse
+Copyright 2026 Dr. Abdul Shareef Pallivalappil, TALFOR Cybersecurity & Digital Forensics (talfor.in)
+
+This product is licensed under the Apache License, Version 2.0.
+Half-Space Trees algorithm: Tan, S.C., Ting, K.M. & Liu, T.F. (2011), "Fast Anomaly
+Detection for Streaming Data", IJCAI. Sigma rule format: https://github.com/SigmaHQ/sigma
